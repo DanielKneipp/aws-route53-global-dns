@@ -3,7 +3,7 @@ resource "aws_route53_zone" "main" {
   name = local.domain_name
 }
 
-module "dns_sp" {
+module "dns_sa" {
   source = "./regional_domain"
 
   providers = {

@@ -1,5 +1,5 @@
 # certificate
-module "acm_sp" {
+module "acm_sa" {
   source  = "terraform-aws-modules/acm/aws"
   version = "~> 4.0"
 

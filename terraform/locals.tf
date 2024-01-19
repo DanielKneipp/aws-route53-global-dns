@@ -5,13 +5,13 @@ locals {
     sa_region = {
       sa1 = {
         name           = "sa1-service"
-        private_subnet = module.vpc_sp.private_subnets[0]
-        public_subnet  = module.vpc_sp.public_subnets[0]
+        private_subnet = module.vpc_sa.private_subnets[0]
+        public_subnet  = module.vpc_sa.public_subnets[0]
       }
       sa2 = {
         name           = "sa2-service"
-        private_subnet = module.vpc_sp.private_subnets[1]
-        public_subnet  = module.vpc_sp.public_subnets[1]
+        private_subnet = module.vpc_sa.private_subnets[1]
+        public_subnet  = module.vpc_sa.public_subnets[1]
       }
     }
     eu_region = {

@@ -6,8 +6,8 @@ module "services_sa" {
     aws = aws.sa
   }
 
-  certificate_arn = module.acm_sp.acm_certificate_arn
-  vpc_id          = module.vpc_sp.vpc_id
+  certificate_arn = module.acm_sa.acm_certificate_arn
+  vpc_id          = module.vpc_sa.vpc_id
 
   name              = each.value.name
   private_subnet_id = each.value.private_subnet
