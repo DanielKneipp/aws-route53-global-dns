@@ -1,26 +1,26 @@
 # Global Endpoint For a Multi-region Service
 
-To have a highly available web application requires several components working together. Automated health checks, failover mechanisms, backup infrastructure, you name it. And when it comes to keep response times low globally, the complexity increases even further.
+To have a highly available web application requires several components working together. Automated health checks, failover mechanisms, backup infrastructure, you name it. And when it comes to keeping response times low globally, the complexity increases even further.
 
-This project presents progressively how to go from a simple application available in the internet, to a full-fledged setup with automated failover, together user traffic segmented per region to keep response times low.
+This project presents progressively how to go from a simple application available on the internet to a full-fledged setup with automated failover, together with user traffic segmented per region to keep response times low.
 
 ## Progressive Architecture
 
 Here we have three different infrastructure designs of the same service with different levels of complexity.
 
-The first one is a simple erb server running in an EC2 machine.
+The first one is a simple web server running on an EC2 machine.
 
 The second is a more reliable design, with another web server running in passive mode. This second web server would only respond to traffic in case the first one becomes inoperable.
 
-And finally, the last one replicates the previous design in a different region, to provide the same service to a customer base located in a geographically distance place than the previous setup.
+Finally, the last one replicates the previous design in a different region, to provide the same service to a customer base located in a geographically distance place than the previous setup.
 
 ### As simple as it gets
 
-This design, as the section implies, is as simple as it gets. Essentially, we have just two-tier application running. We have three main components:
+This design, as the section implies, is as simple as it gets. Essentially, we have just a two-tier application running. We have three main components:
 
 - A DNS record pointing to an [AWS Network Load Balancer (NLB)](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html)
-- This NLB is deployed on the a public subnet to receive traffic from the internet. This first layer/tier allows the web server to not be publicly exposed to the internet, as well as load balancing between multiple server in case more were available
-- And finally we have the web server itself receiving traffic only from the NLB on a private subnet
+- This NLB is deployed on the public subnet to receive traffic from the internet. This first layer/tier allows the web server to not be publicly exposed to the internet, as well as load balancing between multiple servers in case more were available
+- Finally, we have the web server itself receiving traffic only from the NLB on a private subnet
 
 ![Simple Architecture](./docs/general-diagram-simple.png)
 
@@ -42,11 +42,11 @@ The secondary DNS record will only take precedence if the primary server is not 
 
 If those checks fail above a certain threshold, the target (the ec2 instance is labeled as unhealthy). If a certain amount of targets are considered unhealthy, the endpoint of the load balancer itself is considered unhealthy.
 
-This status is reported to Route53 (when using records of type `alias`), which uses this information to decides if the DNS requests should be resolved to the secondary load balancer instead, performing the failover.
+This status is reported to Route53 (when using records of type `alias`), which uses this information to decide if the DNS requests should be resolved to the secondary load balancer instead, consequently, performing the failover.
 
 > ℹ️ We are also making use of making use of the [Availability Zone Affinity](https://aws.amazon.com/blogs/architecture/improving-performance-and-reducing-cost-using-availability-zone-affinity/) architectural pattern to, as mentioned previously, improve response times and reduce [costs](ttps://aws.amazon.com/ec2/pricing/on-demand/#Data_Transfer_within_the_same_AWS_Region). This way, traffic that reaches an AZ never leaves it.
 
-So, now we have a more reliable design with an automated failover mechanism between distinct data centers. However, as a single-region deployment, users in a geographically distant region will suffer with slow response times. Although a [CDN](https://aws.amazon.com/what-is/cdn/) exists for this use case, it is restricted to static assets, not for dynamic APIs.
+So, now we have a more reliable design with an automated failover mechanism between distinct data centers. However, as a single-region deployment, users in a geographically distant region will suffer from slow response times. Although a [CDN](https://aws.amazon.com/what-is/cdn/) exists for this use case, it is used for static assets, not for dynamic APIs.
 
 ### Multi-region setup
 
@@ -60,9 +60,13 @@ The records are assigned to different AWS regions and latency is measured betwee
 
 This design is highly available and provides fast response times to users in different regions of the world. Now, it's time to deploy it!
 
-> ⚠️ Note: this design provides resilience against AZ failure, but not regional outage. If the entire region fails, users of that region won't have the service operational.
+> ⚠️ Note: this design provides resilience against AZ failure, but not regional outages. If the entire region fails, users of that region won't have the service operational.
 
-#### Infrastructure as code
+## Implementation
+
+Now that we have discussed the architectural design, it is time to implement it.
+
+### Infrastructure as code
 
 Here we use terraform to allow us to define all the infrastructure via code. This allows us to perform the design replications mentioned previously with relative ease. We can define pieces of the infrastructure as modules and just reuse them as many times as we need.
 
@@ -78,7 +82,7 @@ Here is a brief description of the main directories and files:
 └── 📄 vpc.tf           -> Network config for public/private subnets
 ```
 
-The specifications of the service deployments are defined in `./terraform/locals.tf` and, for each region and AZ, a service is defined. As shown below, a public subnet is passed for the NLB, and a private one is passed for the server. The subnets define in which AZ the service will be deployed to.
+The specifications of the service deployments are defined in `./terraform/locals.tf` and, for each region and AZ, a service is defined. As shown below, a public subnet is passed for the NLB, and a private one is passed for the server. The subnets define in which AZ the service will be deployed.
 
 ```tf
 sa1 = {
@@ -90,7 +94,7 @@ sa1 = {
 
 > The name defines what you will see as a response if that server specifically responds to the request.
 
-Those variables are looped over in `services.tf` by region via `for_each = local.services.<REGION>`. This is a nice example of, when using some terraform features, we can easily replicate infrastructure with next to none code duplication.
+Those variables are looped over in `services.tf` by region via `for_each = local.services.<REGION>`. This is a nice example of how, when using some terraform features, we can easily replicate infrastructure with next to no code duplication.
 
 `dns.tf` defines which service deployment is the primary and secondary. DNS records are deployed on pairs of primary/secondary via the `regional_domain/` module, together with a record of type latency associated with the region the module is being deployed to.
 
@@ -103,9 +107,9 @@ elb_target_primary = {
 
 Those are the main components of the code. Feel free to dive into the modules to see how they are implemented. Now let's jump into how to deploy this.
 
-#### Deploy
+### Deploy
 
-The very first thing need for this demo is a domain name. If you already have one, remember to configure the Registrar of your domain name to use Route53 as DNS server once the infrastructure has been deployed
+The very first thing needed for this demo is a domain name. If you already have one, remember to configure the Registrar of your domain name to use Route53 as the DNS server once the infrastructure has been deployed
 
 > In my case, I added the name servers assigned to the Hosted Zone as `NS` records for the `locals.domain_name` on Cloudflare.
 
@@ -115,7 +119,7 @@ And if you don't have one, remember you can also buy one from AWS itself as seen
 
 > *Just remember that this will create a Hosted Zone automatically for the domain bought. You will need to change it to make use of the new one that will be created by this project*
 
-In order to run this project you essentially only need terraform. However, I highly suggest to install it via [`asdf`](https://asdf-vm.com/guide/getting-started.html), as it allows you to automate the installation of several other tools and keep multiple version if them installed at the same time.
+In order to run this project you essentially only need terraform. However, I highly suggest installing it via [`asdf`](https://asdf-vm.com/guide/getting-started.html), as it allows you to automate the installation of several other tools and keep multiple versions of them installed at the same time.
 
 Once `asdf` is installed, terraform can be installed in its correct version via
 
@@ -140,7 +144,7 @@ The deployment of all resources can take from 5 to around 10 minutes.
 
 After all has been deployed, you can already try to reach the service via `www.<DOMAIN-NAME>`, in my case, `www.service.dkneipp.com`.
 
-You should see `sa1-service`, or `eu1-service` depending on the region you are currently in 😉. And from a `dig` command we can also identify which region is responding to the request
+You should see `sa1-service`, or `eu1-service` depending on the region you are currently in 😉. From a `dig` command we can also identify which region is responding to the request
 
 | Web UI                                 | DNS Resolution                  |
 |----------------------------------------|---------------------------------|
@@ -148,7 +152,7 @@ You should see `sa1-service`, or `eu1-service` depending on the region you are c
 
 Also, the IP returned by the DNS resolution should match of the NLB of the primary AZ of the region you are closest to.
 
-> 💡 There is only one IP returned because the NLB has only one AZ associated. This ensures the traffic always goes to the designated AZ, unless a failure happens on that AZ.
+> 💡 There is only one IP returned because the NLB has only one AZ associated. This ensures the traffic always goes to the designated AZ unless a failure happens in that AZ.
 
 And by using another computer closest to the other region, we can see the response from that other region
 
@@ -156,7 +160,7 @@ And by using another computer closest to the other region, we can see the respon
 |----------------------------------------|---------------------------------|
 | ![Web service SA](docs/sa-east-ui.png) | ![Dig SA](docs/sa-east-dig.png) |
 
-#### Test failover
+### Test failover
 
 In order to test if the failover from one AZ to the other is happening as expected, remove the instance from the target group associated with the primary NLB of the region you want to test. From the image below it can be seen how the instance can be removed
 
@@ -172,23 +176,23 @@ Wait for around 2 minutes, and you should be able to see the following while try
 |----------------------------------------|---------------------------------|
 | ![Web service SA](docs/eu-central-ui-failover.png) | ![Dig SA](docs/eu-central-dig-failover.png) |
 
-Now, the secondary server is responding to the traffic, as we can identify from the Web UI response, and the fact that the IP of the server changed.
+Now, the secondary server is responding to the traffic, as we can identify from the Web UI response and the fact that the IP of the server changed.
 
 > 💡 Note: since different regions have access to, essentially, different applications, this could be used as a way to promote service upgrades segmented by region
 
 And now, if you add the instance back to the target group of the primary NLB, in a couple of minutes you should see the previous response back again.
 
-#### Cleanup
+### Cleanup
 
 A simple `terraform destroy` should delete all 123 resources.
 
 ## Conclusion
 
-In this project it is shown a step-by-step design evolution from a basic web server available in the web, to a resilient design capable of handling failures in data centers and keep response times low for users in different parts of the globe.
+This project shows a step-by-step design evolution from a basic web server available on the web, to a resilient design capable of handling failures in data centers and keeping response times low for users in different parts of the globe.
 
-A lot more can still be done, of course, like the use of multiple servers on the same AZ to handle more load or use a microservice approach with Kubernetes or AWS ECS to handle the web server code deployment.
+A lot more can still be done, of course, like the use of multiple servers on the same AZ to handle more load or start following a microservice approach with Kubernetes or AWS ECS to handle the web server code deployment.
 
-however, the goal of this project is to show some interesting features we can use from AWS Route53 and NLBs in order to have a fast, reliable and cost-effective web server spread in different parts of the world.
+However, the goal of this project is to show some interesting features we can use from AWS Route53 and NLBs to have a fast, reliable, and cost-effective web server spread in different parts of the world.
 
 ### Notes
 
@@ -198,7 +202,7 @@ however, the goal of this project is to show some interesting features we can us
 
 If you try to access the web server simply via the domain name, you will notice that the DNS request doesn't resolve.
 
-This is because the the `CNAME` records are associated with the `www` subdomain.
+This is because the `CNAME` records are associated with the `www` subdomain.
 
 This has been done because, by default, Hosted Zones already come with `SOA` records domain apex, and `CNAME` records cannot overlap with `SOA` records.
 
