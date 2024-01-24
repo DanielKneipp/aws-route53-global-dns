@@ -36,5 +36,5 @@ module "acm_eu" {
     "*.${local.domain_name}",
   ]
 
-  wait_for_validation = true
+  wait_for_validation = false
 }
