@@ -42,3 +42,15 @@ module "dns_eu" {
     zone_id     = module.services_eu["eu2"].nlb_zone_id
   }
 }
+
+resource "aws_route53_record" "secondary" {
+  zone_id = aws_route53_zone.main.id
+  name    = local.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_globalaccelerator_accelerator.accelerator.dns_name
+    zone_id                = aws_globalaccelerator_accelerator.accelerator.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
